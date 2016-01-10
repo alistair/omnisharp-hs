@@ -24,6 +24,7 @@ library
                       ,bytestring
                       ,transformers
                       ,aeson
+                      ,text
   default-language:    Haskell2010
 
 executable omnisharp-hs-exe
