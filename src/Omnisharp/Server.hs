@@ -5,7 +5,9 @@ module Omnisharp.Server (
   Server,
   startServer,
   stopServer,
-  getAliveStatus
+  getAliveStatus,
+  lookupType,
+  CodeActionRequest (CodeActionRequest)
   ) where
 
 import Control.Monad.IO.Class
@@ -23,7 +25,6 @@ import qualified System.IO.Streams as Streams
 import System.IO.Temp
 import System.Process
 import Control.Exception (try, IOException, SomeException(SomeException))
---import Data.Typeable (typeOf)
 
 import Network.Http.Client hiding (Port)
 
@@ -47,9 +48,6 @@ instance ToJSON CodeActionRequest where
     object ["buffer" .= b, "column" .= (show c), "filename" .= file, "includeDocumentation" .= i, "line" .= (show l)]
       where
         file = T.pack f
-
---  toEncoding (CodeActionRequest b c f i l) =
---    pairs ("buffer" .= b <> "column" .= c <> filename .= f <> "includeDocumentation" .= i <> "line" .= l)
 
 data TypeLookupResponse = TypeLookupResponse {
   codetype :: Maybe T.Text,
