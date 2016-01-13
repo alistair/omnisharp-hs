@@ -45,7 +45,7 @@ data CodeActionRequest = CodeActionRequest {
 
 instance ToJSON CodeActionRequest where
   toJSON (CodeActionRequest b c f i l) =
-    object ["buffer" .= b, "column" .= (show c), "filename" .= file, "includeDocumentation" .= i, "line" .= (show l)]
+    object ["buffer" .= b, "column" .= show c, "filename" .= file, "includeDocumentation" .= i, "line" .= show l]
       where
         file = T.pack f
 
@@ -67,13 +67,12 @@ startServer p f = do
   (_, _, _, ph) <- withSystemTempFile "omnisharp-hs" createServer
   return $ ServerProcess ph p
     where
-    createServer = (\fp h -> createProcess (proc omnisharp [ "-p", (show p), "-s", f ])
-                                 { std_out = UseHandle h})
+    createServer fp h = createProcess (proc omnisharp [ "-p", show p, "-s", f ])
+                           { std_out = UseHandle h}
 
 stopServer :: Server -> IO ()
-stopServer (ServerProcess _ port) =  withConnection (conn) $ (\c -> do
-    q <- buildRequest $ do
-      http GET "/stopserver"
+stopServer (ServerProcess _ port) =  withConnection conn (\c -> do
+    q <- buildRequest $ http GET "/stopserver"
 
     sendRequest c q emptyBody
     r <- try $ receiveResponse c debugHandler
@@ -85,23 +84,17 @@ stopServer (ServerProcess _ port) =  withConnection (conn) $ (\c -> do
     conn = openConnection localhost port
 
 getAliveStatus :: Server -> IO Bool
-getAliveStatus (ServerProcess _ port) = withConnection (conn) $ (\c -> do
-    q <- buildRequest $ do
-      http GET "/checkalivestatus"
-
+getAliveStatus (ServerProcess _ port) = withConnection conn (\c -> do
+    q <- buildRequest $ http GET "/checkalivestatus"
     sendRequest c q emptyBody
-    input <- (receiveResponse c concatHandler)
---    let r = case input of
---              Left e -> False
---              Right r -> r == "true"
+    input <- receiveResponse c concatHandler
     return $ input == "true")
   where
     conn = openConnection localhost port
 
 lookupType :: Server -> CodeActionRequest -> IO TypeLookupResponse
-lookupType (ServerProcess _ port) req = withConnection (conn) $ (\c -> do
-    q <- buildRequest $ do
-      http POST "/typelookup"
+lookupType (ServerProcess _ port) req = withConnection conn (\c -> do
+    q <- buildRequest $ http POST "/typelookup"
     body <- fromLazyByteString $ encode req
     sendRequest c q $ inputStreamBody body
     receiveResponse c jsonHandler :: IO TypeLookupResponse)

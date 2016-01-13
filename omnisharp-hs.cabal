@@ -15,7 +15,7 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Omnisharp.Server
+  exposed-modules:     Omnisharp.Server, Omnisharp.Neovim.Plugin, Omnisharp.Neovim.Lib
   build-depends:       base >= 4.7 && < 5
                       ,process
                       ,http-streams
@@ -25,6 +25,7 @@ library
                       ,transformers
                       ,aeson
                       ,text
+                      ,nvim-hs
   default-language:    Haskell2010
 
 executable omnisharp-hs-exe
