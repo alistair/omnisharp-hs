@@ -7,7 +7,8 @@ module Omnisharp.Server (
   stopServer,
   getAliveStatus,
   lookupType,
-  CodeActionRequest (CodeActionRequest)
+  CodeActionRequest (CodeActionRequest),
+  TypeLookupResponse(..)
   ) where
 
 import Control.Monad.IO.Class
@@ -37,14 +38,14 @@ data Server = ServerProcess ProcessHandle Port
 
 data CodeActionRequest = CodeActionRequest {
   buffer :: T.Text,
+  line :: Int,
   column :: Int,
   filename :: FilePath,
-  includeDocumentation :: Bool,
-  line :: Int
+  includeDocumentation :: Bool
 } deriving Show
 
 instance ToJSON CodeActionRequest where
-  toJSON (CodeActionRequest b c f i l) =
+  toJSON (CodeActionRequest b l c f i) =
     object ["buffer" .= b, "column" .= show c, "filename" .= file, "includeDocumentation" .= i, "line" .= show l]
       where
         file = T.pack f
@@ -64,11 +65,12 @@ localhost = "127.0.0.1"
 
 startServer :: Port -> FilePath -> IO Server
 startServer p f = do
-  (_, _, _, ph) <- withSystemTempFile "omnisharp-hs" createServer
+  (fp, handle) <- openTempFile "/tmp" "omnisharp-hs.log"
+  (_, _, _, ph) <- createServer fp handle
   return $ ServerProcess ph p
     where
     createServer fp h = createProcess (proc omnisharp [ "-p", show p, "-s", f ])
-                           { std_out = UseHandle h}
+                           { std_out = UseHandle h, std_err = UseHandle h}
 
 stopServer :: Server -> IO ()
 stopServer (ServerProcess _ port) =  withConnection conn (\c -> do

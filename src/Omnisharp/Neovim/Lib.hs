@@ -5,6 +5,7 @@ module Omnisharp.Neovim.Lib (
     startServerPlugin
    ,stopServerPlugin
    ,getStatusPlugin
+   ,getTypePlugin
 ) where
 
 import qualified Omnisharp.Server as S
@@ -12,9 +13,11 @@ import qualified Omnisharp.Server as S
 import Control.Applicative
 import Data.Word (Word16)
 import Data.Maybe
+import Data.Text.Encoding
 import qualified Data.Text as T
 
 import Neovim
+import Neovim.API.String
 
 startServerPlugin :: CommandArguments -> String -> Neovim r (Maybe S.Server) ()
 startServerPlugin _ f = do
@@ -40,4 +43,35 @@ getStatusPlugin = do
     liftIO $ case serverM of
                 (Just a)    -> S.getAliveStatus a
                 (Nothing) -> return False
+
+getTypePlugin :: CommandArguments -> Neovim r (Maybe S.Server) ()
+getTypePlugin cargs = do
+    (l,c) <- getCurrentPosition
+    buffer <- getCurrentBuffer
+    serverM <- get
+    req <- S.CodeActionRequest
+              <$> return buffer
+              <*> return ( (read . show) l)
+              <*> return ((read . show) c)
+              <*> return "/home/alistair/Projects/blackdunes.chronicles/src/blackdunes.chronicles/Startup.cs"
+              <*> return False
+    (S.TypeLookupResponse t d) <- liftIO $ case serverM of 
+                                          (Just server) -> S.lookupType server req
+    case t of
+      (Just a)  -> vim_out_write $ T.unpack a
+      (Nothing) -> vim_out_write "Unable to determine type."
+
+
+getCurrentBuffer :: Neovim r st T.Text
+getCurrentBuffer = vim_get_current_window >>= window_get_buffer >>= convert
+    where
+      convert = \x -> case x of Right r -> case r of Buffer b -> return $ decodeUtf8 b
+
+getCurrentPosition :: Neovim r st (Int64, Int64)
+getCurrentPosition = extract <$> positionM
+    where
+      positionM = vim_get_current_window >>= window_get_cursor
+      extract x = case x of (Right p)   -> p
+                            (Left _)    -> (0, 0)
+
 
