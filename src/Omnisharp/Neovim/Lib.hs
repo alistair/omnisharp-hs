@@ -4,6 +4,7 @@
 module Omnisharp.Neovim.Lib (
     startServerPlugin
    ,stopServerPlugin
+   ,getStatusPlugin
 ) where
 
 import qualified Omnisharp.Server as S
@@ -32,4 +33,11 @@ stopServerPlugin _ = do
                 (Just a)  -> S.stopServer a
                 (Nothing) -> return ()
     put Nothing
+
+getStatusPlugin :: Neovim r (Maybe S.Server) Bool
+getStatusPlugin = do
+    serverM <- get
+    liftIO $ case serverM of
+                (Just a)    -> S.getAliveStatus a
+                (Nothing) -> return False
 

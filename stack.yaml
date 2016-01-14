@@ -6,7 +6,9 @@ resolver: lts-3.20
 # Local packages, usually specified by relative directory name
 packages:
 - '.'
-- '/home/alistair/Projects/haskell-vim/nvim-hs'
+- location:
+    git: git@github.com:neovimhaskell/nvim-hs.git
+    commit: ef776a9b2d99042bd35495ca1d17f1a35507a1dc
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:

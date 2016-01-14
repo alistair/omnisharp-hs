@@ -5,7 +5,9 @@
 module Omnisharp.Neovim.Plugin (plugin) where
 
 import Neovim
-import Omnisharp.Neovim.Lib (startServerPlugin, stopServerPlugin)
+import Omnisharp.Neovim.Lib (startServerPlugin
+                            , stopServerPlugin
+                            , getStatusPlugin)
 import Omnisharp.Server
 import Data.Maybe
 
@@ -16,7 +18,8 @@ plugin = wrapPlugin Plugin
       [ ((), Nothing,
         [
           $(command "OmnisharpStartServer" 'startServerPlugin) [CmdSync Sync],
-          $(command "OmnisharpStopServer" 'stopServerPlugin) [CmdSync Sync]
+          $(command "OmnisharpStopServer" 'stopServerPlugin) [CmdSync Sync],
+          $(function "OmnisharpGetStatus" 'getStatusPlugin) Sync
         ])
       ]
     }
