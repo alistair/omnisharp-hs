@@ -15,6 +15,7 @@ import Data.Word (Word16)
 import Data.Maybe
 import Data.Text.Encoding
 import qualified Data.Text as T
+import qualified Data.ByteString.Char8 as C
 
 import Neovim
 import Neovim.API.String
@@ -25,16 +26,16 @@ startServerPlugin _ f = do
     s <- liftIO $ es serverM f
     put $ Just s
     where
-      es s f = case s of (Just a)  -> return a
-                         (Nothing) -> S.startServer 8082 f
+      es s f = case s of Just a  -> return a
+                         Nothing -> S.startServer 8082 f
 
 
 stopServerPlugin :: CommandArguments -> Neovim r (Maybe S.Server) ()
 stopServerPlugin _ = do
     serverM <- get
     liftIO $ case serverM of
-                (Just a)  -> S.stopServer a
-                (Nothing) -> return ()
+                Just a  -> S.stopServer a
+                Nothing -> return ()
     put Nothing
 
 getStatusPlugin :: Neovim r (Maybe S.Server) Bool
@@ -42,15 +43,17 @@ getStatusPlugin = do
     serverM <- get
     liftIO $ case serverM of
                 (Just a)    -> S.getAliveStatus a
-                (Nothing) -> return False
+                Nothing -> return False
 
 getTypePlugin :: CommandArguments -> Neovim r (Maybe S.Server) ()
 getTypePlugin cargs = do
     serverM <- get
     (l,c) <- getCurrentPosition
     buffer <- getCurrentBuffer
+    linesNum <- getNumberOfLines buffer
+    text <- getLines buffer linesNum
     req <- S.CodeActionRequest
-              <$> return buffer
+              <$> return text
               <*> return ( (read . show) l)
               <*> return ((read . show) c)
               <*> return "/home/alistair/Projects/blackdunes.chronicles/src/blackdunes.chronicles/Startup.cs"
@@ -58,8 +61,8 @@ getTypePlugin cargs = do
     (S.TypeLookupResponse t d) <- liftIO $ case serverM of
                                           (Just server) -> S.lookupType server req
     case t of
-      (Just a)  -> vim_out_write $ T.unpack a
-      (Nothing) -> vim_out_write "Unable to determine type."
+      Just a  -> vim_out_write $ T.unpack a
+      Nothing -> vim_report_error "Unable to determine type."
 
 
 getLines :: Buffer -> Int64 -> Neovim t st T.Text
@@ -77,10 +80,14 @@ getNumberOfLines b = do
                           Left e -> 0
     return c
 
-getCurrentBuffer :: Neovim r st T.Text
-getCurrentBuffer = vim_get_current_window >>= window_get_buffer >>= convert
+getCurrentBuffer :: Neovim r st Buffer
+getCurrentBuffer = do
+    buffer <- getBuffer
+    return $ case buffer of Right a -> a
+                            Left e -> Buffer (C.pack "")
+
     where
-      convert x = case x of Right r -> case r of Buffer b -> return $ decodeUtf8 b
+      getBuffer = vim_get_current_window >>= window_get_buffer
 
 getCurrentPosition :: Neovim r st (Int64, Int64)
 getCurrentPosition = extract <$> positionM
@@ -88,5 +95,6 @@ getCurrentPosition = extract <$> positionM
       positionM = vim_get_current_window >>= window_get_cursor
       extract x = case x of (Right p)   -> p
                             (Left _)    -> (0, 0)
+
 
 
