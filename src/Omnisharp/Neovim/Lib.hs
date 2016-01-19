@@ -52,17 +52,19 @@ getTypePlugin cargs = do
     buffer <- getCurrentBuffer
     linesNum <- getNumberOfLines buffer
     text <- getLines buffer linesNum
+    cwd <- getWorkingDirectory
+    filepath <- getBufferName buffer
     req <- S.CodeActionRequest
               <$> return text
               <*> return ( (read . show) l)
               <*> return ((read . show) c)
-              <*> return "/home/alistair/Projects/blackdunes.chronicles/src/blackdunes.chronicles/Startup.cs"
+              <*> return filepath
               <*> return False
     (S.TypeLookupResponse t d) <- liftIO $ case serverM of
                                           (Just server) -> S.lookupType server req
     case t of
-      Just a  -> vim_out_write $ T.unpack a
-      Nothing -> vim_report_error "Unable to determine type."
+      Just a  -> vim_command ("echo \"" ++ (T.unpack a) ++ "\"") >> return ()
+      Nothing ->  vim_command ("echo \"Unable to determine type.\"") >> return ()
 
 
 getLines :: Buffer -> Int64 -> Neovim t st T.Text
@@ -96,5 +98,14 @@ getCurrentPosition = extract <$> positionM
       extract x = case x of (Right p)   -> p
                             (Left _)    -> (0, 0)
 
+getWorkingDirectory :: Neovim r st String
+getWorkingDirectory = do
+    (Right d) <- vim_call_function "getcwd" []
+    case fromObject d of Right a -> return a
 
+-- Interestingly buffer_get_name seems to get the full path of the file....
+getBufferName :: Buffer -> Neovim r st String
+getBufferName b = do
+    (Right n) <- buffer_get_name b
+    return n
 
