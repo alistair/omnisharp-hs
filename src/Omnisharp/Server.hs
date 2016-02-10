@@ -1,5 +1,6 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell     #-}
 
 module Omnisharp.Server (
   Server,
@@ -7,27 +8,34 @@ module Omnisharp.Server (
   stopServer,
   getAliveStatus,
   lookupType,
+  getCodeActions,
   CodeActionRequest (CodeActionRequest),
-  TypeLookupResponse(..)
+  TypeLookupResponse(..),
+  CodeActionResponse(..)
   ) where
 
-import Control.Monad.IO.Class
-import qualified Data.ByteString as S
-import Data.ByteString.Lazy (toStrict)
-import Data.Aeson
-import Data.Maybe
-import Data.Monoid
-import qualified Data.Text as T
-import Data.Word (Word16)
-import System.IO.Streams (InputStream, OutputStream, stdout, makeInputStream)
-import System.IO.Streams.Attoparsec(ParseException)
-import System.IO.Streams.ByteString
-import qualified System.IO.Streams as Streams
-import System.IO.Temp
-import System.Process
-import Control.Exception (try, IOException, SomeException(SomeException))
+import           Control.Exception            (IOException,
+                                               SomeException (SomeException),
+                                               try)
+import           Control.Monad.IO.Class
+import           Data.Aeson
+import           Data.Aeson.TH
+import qualified Data.ByteString              as S
+import           Data.ByteString.Lazy         (toStrict)
+import           Data.Char
+import           Data.Maybe
+import qualified Data.Text                    as T
+import           Data.Word                    (Word16)
+import           System.IO.Streams            (InputStream, OutputStream,
+                                               makeInputStream, stdout)
+import qualified System.IO.Streams            as Streams
+import           System.IO.Streams.Attoparsec (ParseException)
+import           System.IO.Streams.ByteString
+import           System.IO.Temp
+import           System.Process
 
-import Network.Http.Client hiding (Port)
+import           Network.Http.Client          hiding (Port)
+import           Omnisharp.Utils
 
 omnisharp :: FilePath
 omnisharp = "/home/alistair/Projects/YCM/omnisharp-roslyn/artifacts/build/omnisharp/omnisharp"
@@ -37,10 +45,10 @@ type Port = Word16
 data Server = ServerProcess ProcessHandle Port
 
 data CodeActionRequest = CodeActionRequest {
-  buffer :: T.Text,
-  line :: Int,
-  column :: Int,
-  filename :: FilePath,
+  buffer               :: T.Text,
+  line                 :: Int,
+  column               :: Int,
+  filename             :: FilePath,
   includeDocumentation :: Bool
 } deriving Show
 
@@ -51,7 +59,7 @@ instance ToJSON CodeActionRequest where
         file = T.pack f
 
 data TypeLookupResponse = TypeLookupResponse {
-  codetype :: Maybe T.Text,
+  codetype      :: Maybe T.Text,
   documentation :: Maybe T.Text
 } deriving Show
 
@@ -61,6 +69,13 @@ instance FromJSON TypeLookupResponse where
                           v .: "Documentation"
   parseJSON _           = mempty
 
+data CodeActionResponse = CodeActionResponse {
+  codeActions :: [T.Text]
+} deriving (Show)
+
+$(deriveJSON defaultOptions{fieldLabelModifier = toPascelCase} ''CodeActionResponse)
+
+localhost :: S.ByteString
 localhost = "127.0.0.1"
 
 startServer :: Port -> FilePath -> IO Server
@@ -100,5 +115,19 @@ lookupType (ServerProcess _ port) req = withConnection conn (\c -> do
     body <- fromLazyByteString $ encode req
     sendRequest c q $ inputStreamBody body
     receiveResponse c jsonHandler :: IO TypeLookupResponse)
+  where
+    conn = openConnection localhost port
+
+
+getCodeActions :: Server -> CodeActionRequest -> IO CodeActionResponse
+getCodeActions (ServerProcess _ port) req = withConnection conn (\c -> do
+    q <- buildRequest $ do
+-- Here are some extra request configurations as an example
+            http POST "/getcodeactions"
+            setAccept "application/json"
+            setHeader "X-Example" "A Value"
+    body <- fromLazyByteString $ encode req
+    sendRequest c q $ inputStreamBody body
+    receiveResponse c jsonHandler :: IO CodeActionResponse)
   where
     conn = openConnection localhost port

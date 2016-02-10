@@ -8,7 +8,8 @@ import Neovim
 import Omnisharp.Neovim.Lib (startServerPlugin
                             , stopServerPlugin
                             , getStatusPlugin
-                            , getTypePlugin)
+                            , getTypePlugin
+                            , getCodeActionsPlugin)
 import Omnisharp.Server
 import Data.Maybe
 
@@ -21,7 +22,8 @@ plugin = wrapPlugin Plugin
           $(command "OmnisharpStartServer" 'startServerPlugin) [CmdSync Sync],
           $(command "OmnisharpStopServer" 'stopServerPlugin) [CmdSync Sync],
           $(function "OmnisharpGetStatus" 'getStatusPlugin) Sync,
-          $(command "OmnisharpGetType" 'getTypePlugin) [CmdSync Sync, CmdRange WholeFile]
+          $(command "OmnisharpGetType" 'getTypePlugin) [CmdSync Sync, CmdRange WholeFile],
+          $(function "OmnisharpGetCodeActions" 'getCodeActionsPlugin) Sync
         ])
       ]
     }

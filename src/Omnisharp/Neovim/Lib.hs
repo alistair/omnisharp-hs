@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Omnisharp.Neovim.Lib (
@@ -6,19 +6,20 @@ module Omnisharp.Neovim.Lib (
    ,stopServerPlugin
    ,getStatusPlugin
    ,getTypePlugin
+   ,getCodeActionsPlugin
 ) where
 
-import qualified Omnisharp.Server as S
+import qualified Omnisharp.Server      as S
 
-import Control.Applicative
-import Data.Word (Word16)
-import Data.Maybe
-import Data.Text.Encoding
-import qualified Data.Text as T
+import           Control.Applicative
 import qualified Data.ByteString.Char8 as C
+import           Data.Maybe
+import qualified Data.Text             as T
+import           Data.Text.Encoding
+import           Data.Word             (Word16)
 
-import Neovim
-import Neovim.API.String
+import           Neovim
+import           Neovim.API.String
 
 startServerPlugin :: CommandArguments -> String -> Neovim r (Maybe S.Server) ()
 startServerPlugin _ f = do
@@ -64,7 +65,39 @@ getTypePlugin cargs = do
                                           (Just server) -> S.lookupType server req
     case t of
       Just a  -> vim_command ("echo \"" ++ (T.unpack a) ++ "\"") >> return ()
-      Nothing ->  vim_command ("echo \"Unable to determine type.\"") >> return ()
+      Nothing -> vim_command "echo \"Unable to determine type.\"" >> return ()
+
+
+getCodeActionsPlugin :: Neovim r (Maybe S.Server) [String]
+getCodeActionsPlugin = do
+  serverM <- get
+  (l,c) <- getCurrentPosition
+  buffer <- getCurrentBuffer
+  linesNum <- getNumberOfLines buffer
+  text <- getLines buffer linesNum
+  cmw <- getWorkingDirectory
+  filepath <- getBufferName buffer
+  req <- S.CodeActionRequest
+    <$> return text
+    <*> return ((read . show) l)
+    <*> return ((read . show) c)
+    <*> return filepath
+    <*> return False
+  (S.CodeActionResponse actions) <- liftIO $ case serverM of
+    (Just server) -> S.getCodeActions server req
+  return $ T.unpack <$> actions
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 getLines :: Buffer -> Int64 -> Neovim t st T.Text
